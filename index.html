@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ojolali - Monitor Cuan</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #f4f6f8; padding: 16px; max-width: 480px; margin: 0 auto; color: #333; }
+        
+        .header { background: #16a34a; color: white; padding: 16px; text-align: center; font-weight: bold; font-size: 20px; border-radius: 12px; margin-bottom: 16px; }
+        
+        /* Ringkasan Saldo */
+        .card { background: white; padding: 18px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 16px; }
+        .card-title { color: #666; font-size: 13px; margin-bottom: 4px; text-align: center; }
+        .balance { font-size: 28px; font-weight: 800; color: #16a34a; text-align: center; margin-bottom: 12px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .box-info { background: #f9fafb; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #edf2f7; }
+        .box-info .lbl { font-size: 11px; color: #666; }
+        .box-info .val { font-size: 14px; font-weight: bold; margin-top: 2px; }
+        
+        .val-in { color: #16a34a; }
+        .val-out { color: #dc2626; }
+        .val-sav { color: #2563eb; }
+        
+        /* Tombol Aksi */
+        .btn-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { flex: 1; padding: 14px; border: none; border-radius: 10px; font-weight: bold; color: white; font-size: 15px; cursor: pointer; }
+        .btn-in { background: #16a34a; }
+        .btn-out { background: #dc2626; }
+        
+        /* Riwayat */
+        .history-title { font-size: 15px; font-weight: bold; margin-bottom: 10px; }
+        .history-list { display: flex; flex-direction: column; gap: 8px; }
+        .item { background: white; padding: 12px 14px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.03); }
+        .item-info { display: flex; flex-direction: column; }
+        .item-cat { font-weight: bold; font-size: 14px; }
+        .item-meta { font-size: 11px; color: #777; margin-top: 2px; }
+        .item-right { display: flex; align-items: center; gap: 10px; }
+        .item-amt { font-weight: bold; font-size: 14px; text-align: right; }
+        .item-sub { font-size: 10px; color: #2563eb; }
+        .btn-del { background: none; border: none; color: #ccc; font-size: 16px; cursor: pointer; padding: 4px; }
+
+        /* Modal Overlay & Form */
+        .modal { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); justify-content: center; align-items: flex-end; z-index: 100; }
+        .modal-content { background: white; width: 100%; max-width: 480px; padding: 20px; border-radius: 20px 20px 0 0; }
+        .modal-title { font-weight: bold; font-size: 18px; margin-bottom: 14px; }
+        
+        label { font-size: 12px; color: #666; font-weight: bold; display: block; margin-bottom: 4px; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 12px; font-size: 16px; }
+        
+        .method-selector { display: flex; gap: 8px; margin-bottom: 12px; }
+        .method-btn { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; text-align: center; font-size: 14px; cursor: pointer; font-weight: bold; background: #f9fafb; }
+        .method-btn.active-cash { background: #dcfce7; border-color: #16a34a; color: #15803d; }
+        .method-btn.active-wallet { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; }
+
+        .chips { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; }
+        .chip { background: #eee; padding: 6px 12px; border-radius: 16px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+    <div class="header">Ojolali</div>
+
+    <!-- Ringkasan Keuangan Utama -->
+    <div class="card">
+        <div class="card-title">Pendapatan Bersih (Setelah Potong 20%)</div>
+        <div class="balance" id="netProfit">Rp 0</div>
+        
+        <!-- Saldo Berdasarkan Metode -->
+        <div class="grid-2">
+            <div class="box-info">
+                <div class="lbl">Sisa Tunai</div>
+                <div class="val val-in" id="cashBalance">Rp 0</div>
+            </div>
+            <div class="box-info">
+                <div class="lbl">Sisa E-Wallet</div>
+                <div class="val val-in" id="walletBalance">Rp 0</div>
+            </div>
+        </div>
+
+        <!-- Rincian Pemasukan, Pengeluaran & Tabungan 20% -->
+        <div class="grid-2">
+            <div class="box-info">
+                <div class="lbl">Total Kotor</div>
+                <div class="val val-in" id="totalGross">Rp 0</div>
+            </div>
+            <div class="box-info">
+                <div class="lbl">Alokasi 20%</div>
+                <div class="val val-sav" id="totalSaved">Rp 0</div>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="box-info">
+                <div class="lbl">Total Pengeluaran</div>
+                <div class="val val-out" id="totalOut">Rp 0</div>
+            </div>
+            <div class="box-info">
+                <div class="lbl">Bersih Masuk (80%)</div>
+                <div class="val val-in" id="totalNetIn">Rp 0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tombol Input Cepat -->
+    <div class="btn-group">
+        <button class="btn btn-in" onclick="openModal('masuk')">+ Pemasukan Order</button>
+        <button class="btn btn-out" onclick="openModal('keluar')">- Pengeluaran</button>
+    </div>
+
+    <!-- Riwayat Transaksi -->
+    <div class="history-title">Riwayat Hari Ini</div>
+    <div class="history-list" id="historyList"></div>
+
+    <!-- Modal Form -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modalTitle">Order Selesai</div>
+            
+            <label>Metode Pembayaran</label>
+            <div class="method-selector">
+                <div class="method-btn active-cash" id="btnCash" onclick="selectMethod('Tunai')">💵 Tunai</div>
+                <div class="method-btn" id="btnWallet" onclick="selectMethod('E-Wallet')">📱 E-Wallet</div>
+            </div>
+
+            <div id="categoryContainer" style="display: none;">
+                <label>Untuk Pengeluaran Apa?</label>
+                <select id="categorySelect">
+                    <option value="BBM">BBM / Bensin</option>
+                    <option value="MAKAN DAN MINUM">Makan & Minum</option>
+                    <option value="PAKET DATA">Paket Data / Pulsa</option>
+                    <option value="TOP UP APLIKASI">Top Up Saldo Aplikasi</option>
+                    <option value="PARKIR">Parkir & Tol</option>
+                    <option value="SERVIS / OLI">Servis & Oli Motor</option>
+                    <option value="LAIN-LAIN">Lain-lain</option>
+                </select>
+            </div>
+
+            <label>Jumlah Uang (Rp)</label>
+            <input type="number" id="amountInput" placeholder="Contoh: 25000">
+            
+            <div class="chips">
+                <div class="chip" onclick="addNominal(10000)">+10rb</div>
+                <div class="chip" onclick="addNominal(20000)">+20rb</div>
+                <div class="chip" onclick="addNominal(50000)">+50rb</div>
+                <div class="chip" onclick="addNominal(100000)">+100rb</div>
+            </div>
+
+            <button class="btn btn-in" id="saveBtn" style="width: 100%;" onclick="saveTransaction()">Simpan Transaksi</button>
+        </div>
+    </div>
+
+    <script>
+        let currentType = 'masuk';
+        let selectedMethod = 'Tunai';
+        let transactions = JSON.parse(localStorage.getItem('ojol_v2_tx')) || [];
+
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
+        }
+
+        function selectMethod(method) {
+            selectedMethod = method;
+            const btnCash = document.getElementById('btnCash');
+            const btnWallet = document.getElementById('btnWallet');
+
+            if (method === 'Tunai') {
+                btnCash.className = 'method-btn active-cash';
+                btnWallet.className = 'method-btn';
+            } else {
+                btnCash.className = 'method-btn';
+                btnWallet.className = 'method-btn active-wallet';
+            }
+        }
+
+        function render() {
+            let totalGross = 0;
+            let totalSaved = 0;
+            let totalNetIn = 0;
+            let totalOut = 0;
+            
+            let cashBalance = 0;
+            let walletBalance = 0;
+
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+
+            transactions.forEach((tx, index) => {
+                const date = new Date(tx.date);
+                const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+                if (tx.type === 'masuk') {
+                    totalGross += tx.grossAmount;
+                    totalSaved += tx.savedAmount;
+                    totalNetIn += tx.netAmount;
+
+                    if (tx.method === 'Tunai') {
+                        cashBalance += tx.netAmount; // Yang menambah dompet tunai adalah hasil setelah potong 20%
+                    } else {
+                        walletBalance += tx.netAmount; // Yang menambah dompet e-wallet adalah hasil setelah potong 20%
+                    }
+                } else {
+                    totalOut += tx.amount;
+
+                    if (tx.method === 'Tunai') {
+                        cashBalance -= tx.amount;
+                    } else {
+                        walletBalance -= tx.amount;
+                    }
+                }
+
+                // Element Riwayat
+                const item = document.createElement('div');
+                item.className = 'item';
+                
+                let subText = '';
+                if (tx.type === 'masuk') {
+                    subText = `<div class="item-sub">Bersih: ${formatRupiah(tx.netAmount)} (Potong 20%: ${formatRupiah(tx.savedAmount)})</div>`;
+                }
+
+                item.innerHTML = `
+                    <div class="item-info">
+                        <div class="item-cat">${tx.type === 'masuk' ? 'Order Selesai' : tx.category}</div>
+                        <div class="item-meta">${tx.method} • ${timeStr}</div>
+                        ${subText}
+                    </div>
+                    <div class="item-right">
+                        <div class="item-amt ${tx.type === 'masuk' ? 'val-in' : 'val-out'}">
+                            ${tx.type === 'masuk' ? '+' : '-'} ${formatRupiah(tx.type === 'masuk' ? tx.grossAmount : tx.amount)}
+                        </div>
+                        <button class="btn-del" onclick="deleteTransaction(${index})">✕</button>
+                    </div>
+                `;
+                historyList.prepend(item);
+            });
+
+            // Update UI Ringkasan
+            document.getElementById('totalGross').innerText = formatRupiah(totalGross);
+            document.getElementById('totalSaved').innerText = formatRupiah(totalSaved);
+            document.getElementById('totalNetIn').innerText = formatRupiah(totalNetIn);
+            document.getElementById('totalOut').innerText = formatRupiah(totalOut);
+            
+            document.getElementById('cashBalance').innerText = formatRupiah(cashBalance);
+            document.getElementById('walletBalance').innerText = formatRupiah(walletBalance);
+
+            const netTotal = totalNetIn - totalOut;
+            const netEl = document.getElementById('netProfit');
+            netEl.innerText = formatRupiah(netTotal);
+            netEl.style.color = netTotal >= 0 ? '#16a34a' : '#dc2626';
+
+            // Simpan ke HP
+            localStorage.setItem('ojol_v2_tx', JSON.stringify(transactions));
+        }
+
+        function openModal(type) {
+            currentType = type;
+            selectMethod('Tunai'); // Default Tunai
+            
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modalTitle');
+            const catContainer = document.getElementById('categoryContainer');
+            const saveBtn = document.getElementById('saveBtn');
+
+            if (type === 'masuk') {
+                title.innerText = '➕ Pemasukan Order Selesai';
+                title.style.color = '#16a34a';
+                catContainer.style.display = 'none';
+                saveBtn.className = 'btn btn-in';
+            } else {
+                title.innerText = '➖ Pengeluaran Uang';
+                title.style.color = '#dc2626';
+                catContainer.style.display = 'block';
+                saveBtn.className = 'btn btn-out';
+            }
+
+            document.getElementById('amountInput').value = '';
+            modal.style.display = 'flex';
+        }
+
+        function addNominal(val) {
+            const input = document.getElementById('amountInput');
+            input.value = (parseInt(input.value) || 0) + val;
+        }
+
+        function saveTransaction() {
+            const amount = parseInt(document.getElementById('amountInput').value);
+
+            if (!amount || amount <= 0) return alert('Masukkan jumlah uang yang valid!');
+
+            if (currentType === 'masuk') {
+                const saved = Math.round(amount * 0.20); // 20% Otomatis Dipotong
+                const net = amount - saved;              // 80% Bersih Masuk
+
+                transactions.push({
+                    type: 'masuk',
+                    method: selectedMethod,
+                    grossAmount: amount,
+                    savedAmount: saved,
+                    netAmount: net,
+                    date: new Date().toISOString()
+                });
+            } else {
+                const category = document.getElementById('categorySelect').value;
+                transactions.push({
+                    type: 'keluar',
+                    method: selectedMethod,
+                    category: category,
+                    amount: amount,
+                    date: new Date().toISOString()
+                });
+            }
+
+            document.getElementById('modal').style.display = 'none';
+            render();
+        }
+
+        function deleteTransaction(index) {
+            if (confirm('Hapus catatan ini?')) {
+                transactions.splice(index, 1);
+                render();
+            }
+        }
+
+        // Close modal saat klik di luar area modal
+        window.onclick = function(e) {
+            const modal = document.getElementById('modal');
+            if (e.target === modal) modal.style.display = 'none';
+        };
+
+        render();
+    </script>
+</body>
+</html>
